@@ -16,3 +16,7 @@ The business goal is to design the strategies to maximizing the number of annual
 
 In this case study, I am using the Public Bike Trip Data from the [Divvy Bikes website](https://divvybikes.com/system-data): [Datasets from January 2023 to December 2023](https://divvy-tripdata.s3.amazonaws.com/index.html).
 The data for this case study is provided by [Motivate International Inc](https://www.divvybikes.com/data-license-agreement), has been made publicly available for download. 
+
+Notebook
+
+For reading notebook, you can use this [link](https://thuankhang.github.io/casestudy-cyclistic-bike-share/Notebook/Cyclistic_BikeShare.html)

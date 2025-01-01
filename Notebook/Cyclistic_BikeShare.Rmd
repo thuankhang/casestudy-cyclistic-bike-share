@@ -1,0 +1,332 @@
+---
+title: "Cyclistic Bike Share"
+author: "Thuan Khang Dinh"
+date: '`r Sys.Date()`'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+required_libs = c("igraph", "ggplot2", "geodata", "sf","sqldf")
+for (l in required_libs) {
+  if (!require(l, character.only = TRUE)) {
+      install.packages(l)
+  }
+  library(l, character.only = TRUE)
+}
+```
+
+**For Github version follow [link](https://github.com/thuankhang/casestudy-cyclistic-bike-share)**
+
+# Overview:
+
+In this study, we will get better understanding about the diference of annual members and casual members using bikes. Our objective is to delve into the Cyclistic historical bike trip data, analyzing patterns, preferences, and behaviors of these two distinct groups.
+
+The business goal is to design the strategies to maximizing the number of annual memberships, backed up with compelling data insights and data visualizations, which have been identified that more profitable for Cyclistic.
+
+# STEP 1: ASK
+
+## 1.1 Company backgroud:
+
+Cyclistic is a bike-share company in Chicago, offering a fleet of bicycles and locked into a network of stations across the city. The bikes can be unlocked from one station and returned to any other station in the system anytime. Cyclistic operates in a subscription-based model, with optios of casual members and annual members.
+
+## 1.2 Key stakeholders:
+
+**1.	Lily Moreno:** The director of marketing who is responsible for the development of campaigns and initiative to promote the bike-share program.
+
+**2.	Cyclistic marketing analytics team:** The team is responsible for collecting, analyzing, and reporting data that helps guide Cyclistic marketing strategy.
+
+**3.	Cyclistic executive team:** The team will decide whether to approve the recommended marketing program.
+
+## 1.3 Problem Statement: 
+
+Understanding the difference between casual members and annual riders of Cyclistic bikes to design a new marketing strategy of converting casual riders to annual users.
+
+## 1.4 Business Task: 
+
+Analyze the Cyclistic’s history bike trip data to understand the differences and use those insights to design a marketing strategy to convert casual to annual riders.
+
+## 1.5 Deliverable:
+1.	A clear statement of the business task.
+2.	A description of all data sources used.
+3.	Documentation of any cleaning or manipulation of data.
+4.	A summary of the analysis.
+5.	Supporting visualization and key findings.
+6.	The top three recommendation based on the analysis.
+
+## 1.6 Data Context:
+
+Our data, derived from Cyclistic's historical trip records, includes a complete year of ride data, providing insights into the usage patterns of both casual and annual members. The crucial variables in our dataset include each trip's start and end times, start and end station details, rideable type, and whether the rider is a casual or annual member.
+
+
+# STEP 2: PREPARE
+
+## 2.1 Information on Data Source:
+
+1.	In this case study, I am using the Public Bike Trip Data from the [Divvy Bikes website](https://divvybikes.com/system-data): [Datasets from January 2023 to December 2023](https://divvy-tripdata.s3.amazonaws.com/index.html).
+
+2.	The data for this case study is provided by [Motivate International Inc](https://www.divvybikes.com/data-license-agreement), has been made publicly available for download. 
+
+3.	The data represent historical trip data of Cyclistic bikes, in format of CSV, with each row is a trip, and columns indicate features such as `trip type`, `start and end time`, `start and end station`, and `user type`.
+
+## 2.2 Limitations of Data Set:
+
+1.	Data-privacy issues prohibit from using riders’ personally identifiable information, so we cannot do biological related analysis.
+
+2.	The data only includes people who have chosen to use the Cyclistic service, and might not represent the entire population of bike riders in Chicago.
+
+## 2.3 Is Data ROCCC:
+
+ROCCC stands for **R**eliable, **O**riginal, **C**omprehensive, **C**urrent, and **C**ited.
+
+1.	Reliable – High – The data is collected and provided by the company that operates the bicycle sharing service in Chicago, under the authority of the City.
+
+2.	Original – High – The data originates directly from Bikeshare’s operations of the Divvy service. It is not derived from secondary sources, so it is authentic and directly related to the service’s operation.
+
+3.	Comprehensive – Moderate – The license grants access to certain Divvy system data, which implies that the data may not be fully comprehensive.
+
+4.	Current – High – It does not provide details on how often the data is updated in license, but if you take a look at the data provided, it does update monthly.
+
+5.	Cited – Low – No explicit citation requirement.
+
+## 2.4 Importing Data:
+
+```{r}
+# January
+tripdata_2023_01 <- read.csv("https://raw.githubusercontent.com/thuankhang/casestudy-cyclistic-bike-share/main/Data/2023/202301-divvy-tripdata.csv")
+
+
+# February
+tripdata_2023_02 <- read.csv("https://raw.githubusercontent.com/thuankhang/casestudy-cyclistic-bike-share/main/Data/2023/202302-divvy-tripdata.csv")
+
+
+# March
+tripdata_2023_03 <- read.csv("https://raw.githubusercontent.com/thuankhang/casestudy-cyclistic-bike-share/main/Data/2023/202303-divvy-tripdata.csv")
+
+
+# April
+tripdata_2023_04 <- read.csv("https://raw.githubusercontent.com/thuankhang/casestudy-cyclistic-bike-share/main/Data/2023/202304-divvy-tripdata.csv")
+
+
+# May
+tripdata_2023_05_1 <- read.csv("https://raw.githubusercontent.com/thuankhang/casestudy-cyclistic-bike-share/main/Data/2023/202305-divvy-tripdata_1.csv")
+tripdata_2023_05_2 <- read.csv("https://raw.githubusercontent.com/thuankhang/casestudy-cyclistic-bike-share/main/Data/2023/202305-divvy-tripdata_2.csv")
+
+tripdata_2023_05 = sqldf("
+  SELECT * FROM tripdata_2023_05_1
+  UNION ALL
+  SELECT * FROM tripdata_2023_05_2
+")
+rm(tripdata_2023_05_1)
+rm(tripdata_2023_05_2)
+
+
+# June
+tripdata_2023_06_1 <- read.csv("https://raw.githubusercontent.com/thuankhang/casestudy-cyclistic-bike-share/main/Data/2023/202306-divvy-tripdata_1.csv")
+tripdata_2023_06_2 <- read.csv("https://raw.githubusercontent.com/thuankhang/casestudy-cyclistic-bike-share/main/Data/2023/202306-divvy-tripdata_2.csv")
+tripdata_2023_06 = sqldf("
+  SELECT * FROM tripdata_2023_06_1
+  UNION ALL
+  SELECT * FROM tripdata_2023_06_2
+")
+rm(tripdata_2023_06_1)
+rm(tripdata_2023_06_2)
+
+
+# July
+tripdata_2023_07_1 <- read.csv("https://raw.githubusercontent.com/thuankhang/casestudy-cyclistic-bike-share/main/Data/2023/202307-divvy-tripdata_1.csv")
+tripdata_2023_07_2 <- read.csv("https://raw.githubusercontent.com/thuankhang/casestudy-cyclistic-bike-share/main/Data/2023/202307-divvy-tripdata_2.csv")
+tripdata_2023_07 = sqldf("
+  SELECT * FROM tripdata_2023_07_1
+  UNION ALL
+  SELECT * FROM tripdata_2023_07_2
+")
+rm(tripdata_2023_07_1)
+rm(tripdata_2023_07_2)
+
+
+# August
+tripdata_2023_08_1 <- read.csv("https://raw.githubusercontent.com/thuankhang/casestudy-cyclistic-bike-share/main/Data/2023/202308-divvy-tripdata_1.csv")
+tripdata_2023_08_2 <- read.csv("https://raw.githubusercontent.com/thuankhang/casestudy-cyclistic-bike-share/main/Data/2023/202308-divvy-tripdata_2.csv")
+tripdata_2023_08 = sqldf("
+  SELECT * FROM tripdata_2023_08_1
+  UNION ALL
+  SELECT * FROM tripdata_2023_08_2
+")
+rm(tripdata_2023_08_1)
+rm(tripdata_2023_08_2)
+
+
+# September
+tripdata_2023_09_1 <- read.csv("https://raw.githubusercontent.com/thuankhang/casestudy-cyclistic-bike-share/main/Data/2023/202309-divvy-tripdata_1.csv")
+tripdata_2023_09_2 <- read.csv("https://raw.githubusercontent.com/thuankhang/casestudy-cyclistic-bike-share/main/Data/2023/202309-divvy-tripdata_2.csv")
+tripdata_2023_09 = sqldf("
+  SELECT * FROM tripdata_2023_09_1
+  UNION ALL
+  SELECT * FROM tripdata_2023_09_2
+")
+rm(tripdata_2023_09_1)
+rm(tripdata_2023_09_2)
+
+
+# October
+tripdata_2023_10_1 <- read.csv("https://raw.githubusercontent.com/thuankhang/casestudy-cyclistic-bike-share/main/Data/2023/202310-divvy-tripdata_1.csv")
+tripdata_2023_10_2 <- read.csv("https://raw.githubusercontent.com/thuankhang/casestudy-cyclistic-bike-share/main/Data/2023/202310-divvy-tripdata_2.csv")
+tripdata_2023_10 = sqldf("
+  SELECT * FROM tripdata_2023_10_1
+  UNION ALL
+  SELECT * FROM tripdata_2023_10_2
+")
+rm(tripdata_2023_10_1)
+rm(tripdata_2023_10_2)
+
+
+# November
+tripdata_2023_11 <- read.csv("https://raw.githubusercontent.com/thuankhang/casestudy-cyclistic-bike-share/main/Data/2023/202311-divvy-tripdata.csv")
+
+
+# December
+tripdata_2023_12 <- read.csv("https://raw.githubusercontent.com/thuankhang/casestudy-cyclistic-bike-share/main/Data/2023/202312-divvy-tripdata.csv")
+```
+
+## 2.5 Understand the data
+
+As all the datasets have the same columns, we will inspect only one of those.
+
+```{r}
+str(tripdata_2023_01)
+```
+
+```{r}
+head(tripdata_2023_01)
+```
+The dataset is organized as we said, so we are safe to come to next step.
+
+# STEP 3: PROCESS
+
+In this step, I will do several things:
+
+* Merged all dataframes into one dataframe: using `UNION ALL`
+* Add column `ride_length`: using `julianday(ended_at) - julianday(started_at)` and `AS ride_length`
+* Add column `day_of_week`: using `strftime('%w', started_at) AS day_of_week`
+* Get rid of any observations which have NA value: using `WHERE ... IS NOT NULL`
+* Get rid of case where `started_at` is after `ended_at`: using `datetime(started_at) <= datetime(ended_at)`
+
+
+```{r}
+df_names = c("tripdata_2023_01", "tripdata_2023_02", "tripdata_2023_03", "tripdata_2023_04", "tripdata_2023_05","tripdata_2023_06", "tripdata_2023_07", "tripdata_2023_08", "tripdata_2023_09", "tripdata_2023_10", "tripdata_2023_11", "tripdata_2023_12")
+
+select_clause = "
+    SELECT *, 
+          CAST((julianday(ended_at) - julianday(started_at)) * 86400 AS INTEGER) AS ride_length, 
+          CASE 
+            WHEN strftime('%w', started_at) = '0' THEN 'Sunday'
+            WHEN strftime('%w', started_at) = '1' THEN 'Monday'
+            WHEN strftime('%w', started_at) = '2' THEN 'Tuesday'
+            WHEN strftime('%w', started_at) = '3' THEN 'Wednesday'
+            WHEN strftime('%w', started_at) = '4' THEN 'Thursday'
+            WHEN strftime('%w', started_at) = '5' THEN 'Friday'
+            WHEN strftime('%w', started_at) = '6' THEN 'Saturday'
+  END AS day_of_week"
+
+columns = colnames(tripdata_2023_01)
+
+where_clause = paste0(" WHERE " ,paste(columns, "IS NOT NULL", collapse = " AND "), " AND datetime(started_at) <= datetime(ended_at)")
+
+query = paste(select_clause, " FROM ", df_names, collapse = paste0(where_clause," UNION ALL "))
+merged_data = sqldf(query)
+
+rm(tripdata_2023_01)
+rm(tripdata_2023_02)
+rm(tripdata_2023_03)
+rm(tripdata_2023_04)
+rm(tripdata_2023_05)
+rm(tripdata_2023_06)
+rm(tripdata_2023_07)
+rm(tripdata_2023_08)
+rm(tripdata_2023_09)
+rm(tripdata_2023_10)
+rm(tripdata_2023_11)
+rm(tripdata_2023_12)
+  
+str(merged_data)
+```
+
+# STEP 4: ANALYZE
+
+## Number of rides by user type:
+
+```{r}
+query = "
+SELECT member_casual, COUNT(*) AS number_of_rides
+FROM merged_data
+GROUP BY member_casual;
+"
+
+rides_by_user_type = sqldf(query)
+rides_by_user_type
+```
+
+**Insight:**
+* Member users have significantly more rides than casual users, with more than 1.5 million more rides.
+* This suggests that members tend to use the service more frequently than casual users.
+
+## Number of rides by user type and by day of week:
+
+### Table
+
+```{r}
+query = "
+SELECT member_casual AS user_type, 
+       SUM(CASE WHEN day_of_week = 'Sunday' THEN 1 ELSE 0 END) AS Sunday,
+       SUM(CASE WHEN day_of_week = 'Monday' THEN 1 ELSE 0 END) AS Monday,
+       SUM(CASE WHEN day_of_week = 'Tuesday' THEN 1 ELSE 0 END) AS Tuesday,
+       SUM(CASE WHEN day_of_week = 'Wednesday' THEN 1 ELSE 0 END) AS Wednesday,
+       SUM(CASE WHEN day_of_week = 'Thursday' THEN 1 ELSE 0 END) AS Thursday,
+       SUM(CASE WHEN day_of_week = 'Friday' THEN 1 ELSE 0 END) AS Friday,
+       SUM(CASE WHEN day_of_week = 'Saturday' THEN 1 ELSE 0 END) AS Saturday
+FROM merged_data
+GROUP BY member_casual;
+"
+rides_by_user_type_day_of_week = sqldf(query)
+rides_by_user_type_day_of_week
+```
+
+### Bar Plot
+
+```{r}
+query = "
+SELECT member_casual AS user_type, day_of_week, COUNT(*) AS num_rides
+FROM merged_data
+GROUP BY user_type, day_of_week
+ORDER BY 
+    CASE
+        WHEN day_of_week = 'Sunday' THEN 1
+        WHEN day_of_week = 'Monday' THEN 2
+        WHEN day_of_week = 'Tuesday' THEN 3
+        WHEN day_of_week = 'Wednesday' THEN 4
+        WHEN day_of_week = 'Thursday' THEN 5
+        WHEN day_of_week = 'Friday' THEN 6
+        WHEN day_of_week = 'Saturday' THEN 7
+    END;
+"
+df_rides_by_user_type_day_of_week = sqldf(query)
+
+#For order x-axis
+df_rides_by_user_type_day_of_week$day_of_week = factor(df_rides_by_user_type_day_of_week$day_of_week, levels=unique(df_rides_by_user_type_day_of_week$day_of_week))
+
+ggplot(df_rides_by_user_type_day_of_week, aes(x = day_of_week, y = num_rides, fill = user_type)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Number of Rides by User Type and Day of the Week",
+       x = "Day of the Week",
+       y = "Number of Rides") +
+  theme_minimal() +
+  scale_y_continuous(labels = scales::label_number())
+```
+
+**Insight**
+
+* Casual users primarily use the service on weekends, with a peak on Saturday, indicating more leisure or occasional usage.
+* Members use the service more consistently throughout the week, with higher usage on weekdays, particularly on Thursday, suggesting more regular or commuter-based usage.
+* There is potential to increase engagement for members on weekends and for casual users during weekdays through targeted strategies.

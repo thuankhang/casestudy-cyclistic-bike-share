@@ -1,0 +1,11 @@
+"","user_type","time_interval","num_rides"
+"1","casual","Early Morning",100044
+"2","member","Early Morning",119726
+"3","casual","Morning Commute",153533
+"4","member","Morning Commute",543855
+"5","casual","Midday",675156
+"6","member","Midday",1089955
+"7","casual","Evening Commute",710961
+"8","member","Evening Commute",1273236
+"9","casual","Night",412728
+"10","member","Night",631405

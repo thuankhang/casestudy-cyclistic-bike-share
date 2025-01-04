@@ -1,5 +1,5 @@
 ---
-title: "Cyclistic Bike Share"
+title: "Case Study: Cyclistic Bike Share"
 author: "Thuan Khang Dinh"
 date: '`r Sys.Date()`'
 output: html_document
@@ -7,11 +7,8 @@ output: html_document
 
 # README:
 
--   Here is my notebook(from STEP PREPARE to STEP ACT) for all code, and some explanations what I have done.
 -   If you want to go to **Github** version follow [link](https://github.com/thuankhang/casestudy-cyclistic-bike-share)
 -   If you want to see **Dashboard** follow [link]()
-
-
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -24,8 +21,6 @@ for (l in required_libs) {
   library(l, character.only = TRUE)
 }
 ```
-
-
 
 # Overview:
 
@@ -100,7 +95,7 @@ ROCCC stands for **R**eliable, **O**riginal, **C**omprehensive, **C**urrent, and
 
 ## 2.4 Import Data:
 
-```{r}
+```{r, echo=FALSE}
 # January
 tripdata_2023_01 <- read.csv("../Data/2023/202301-divvy-tripdata.csv")
 
@@ -198,9 +193,22 @@ tripdata_2023_11 <- read.csv("../Data/2023/202311-divvy-tripdata.csv")
 tripdata_2023_12 <- read.csv("../Data/2023/202312-divvy-tripdata.csv")
 ```
 
+-   Importing trip data Jan 2023: `r exists("tripdata_2023_01")`
+-   Importing trip data Feb 2023: `r exists("tripdata_2023_02")`
+-   Importing trip data Mar 2023: `r exists("tripdata_2023_03")`
+-   Importing trip data Apr 2023: `r exists("tripdata_2023_04")`
+-   Importing trip data May 2023: `r exists("tripdata_2023_05")`
+-   Importing trip data Jun 2023: `r exists("tripdata_2023_06")`
+-   Importing trip data Jul 2023: `r exists("tripdata_2023_07")`
+-   Importing trip data Aug 2023: `r exists("tripdata_2023_08")`
+-   Importing trip data Sep 2023: `r exists("tripdata_2023_09")`
+-   Importing trip data Oct 2023: `r exists("tripdata_2023_10")`
+-   Importing trip data Nov 2023: `r exists("tripdata_2023_11")`
+-   Importing trip data Dec 2023: `r exists("tripdata_2023_12")`
+
 ## 2.5 Understand the data
 
-As all the datasets have the same columns, we will inspect only one of those.
+As all the datasets have the same columns, we will inspect only one of those, we choose `tripdata_2023_01`.
 
 ```{r}
 str(tripdata_2023_01)
@@ -222,8 +230,57 @@ In this step, I will do several things:
 -   Get rid of any observations which have NA value: using `WHERE ... IS NOT NULL`
 -   Get rid of case where `started_at` is after `ended_at`: using `datetime(started_at) <= datetime(ended_at)`
 -   Change name `started_at` to `start_at` and `ended_at` to `end_at`.
+-   Get rid of `lat` and `lng`.
 
-```{r}
+The `query`:
+
+```         
+SELECT ride_id, rideable_type, 
+      started_at AS start_at, 
+      ended_at AS end_at,
+      member_casual,
+      start_station_name, start_station_id,
+      end_station_name, end_station_id,
+      CAST((julianday(ended_at) - julianday(started_at)) * 86400 AS INTEGER) AS ride_length, 
+      CASE 
+        WHEN strftime('%w', started_at) = '0' THEN 'Sunday'
+        WHEN strftime('%w', started_at) = '1' THEN 'Monday'
+        WHEN strftime('%w', started_at) = '2' THEN 'Tuesday'
+        WHEN strftime('%w', started_at) = '3' THEN 'Wednesday'
+        WHEN strftime('%w', started_at) = '4' THEN 'Thursday'
+        WHEN strftime('%w', started_at) = '5' THEN 'Friday'
+        WHEN strftime('%w', started_at) = '6' THEN 'Saturday'
+      END AS day_of_week,
+      
+      CASE 
+         WHEN CAST(strftime('%H', started_at) AS INTEGER) BETWEEN 0 AND 5 THEN 'Early Morning'
+         WHEN CAST(strftime('%H', started_at) AS INTEGER) BETWEEN 6 AND 8 THEN 'Morning Commute'
+         WHEN CAST(strftime('%H', started_at) AS INTEGER) BETWEEN 9 AND 14 THEN 'Midday'
+         WHEN CAST(strftime('%H', started_at) AS INTEGER) BETWEEN 15 AND 18 THEN 'Evening Commute'
+         WHEN CAST(strftime('%H', started_at) AS INTEGER) BETWEEN 19 AND 23 THEN 'Night'
+      END AS time_interval,
+      strftime('%m', started_at) AS month  
+      
+FROM  tripdata_2023_01  
+
+WHERE ride_id IS NOT NULL AND 
+   rideable_type IS NOT NULL AND 
+   started_at IS NOT NULL AND 
+   ended_at IS NOT NULL AND 
+   start_station_name IS NOT NULL AND 
+   start_station_id IS NOT NULL AND 
+   end_station_name IS NOT NULL AND 
+   end_station_id IS NOT NULL AND 
+   member_casual IS NOT NULL AND 
+   CAST((julianday(ended_at) - julianday(started_at)) * 86400 AS INTEGER) > 0 
+   
+UNION ALL
+
+...
+
+```
+
+```{r,echo=FALSE}
 df_names = c("tripdata_2023_01", "tripdata_2023_02", "tripdata_2023_03", "tripdata_2023_04", "tripdata_2023_05","tripdata_2023_06", "tripdata_2023_07", "tripdata_2023_08", "tripdata_2023_09", "tripdata_2023_10", "tripdata_2023_11", "tripdata_2023_12")
 
 select_clause = "
@@ -256,9 +313,13 @@ select_clause = "
 
 columns = colnames(tripdata_2023_01)
 
-where_clause = paste0(" WHERE " ,paste(columns, "IS NOT NULL", collapse = " AND "), " AND CAST((julianday(ended_at) - julianday(started_at)) * 86400 AS INTEGER) > 0")
+where_clause = paste0(" WHERE " ,paste(columns, " IS NOT NULL", collapse = " AND "), " AND CAST((julianday(ended_at) - julianday(started_at)) * 86400 AS INTEGER) > 0")
 
-query = paste(select_clause, " FROM ", df_names, collapse = paste0(where_clause," UNION ALL "))
+query = paste(
+    paste(select_clause, " FROM ", df_names, where_clause),
+    collapse = " UNION ALL "
+)
+
 merged_data = sqldf(query)
 
 # Remove df that no longer use for prevent out of memory
@@ -282,15 +343,15 @@ str(merged_data)
 
 ## Overall:
 
+Here is a summary table:
+
 ```{r}
-rm(ride_summary)
 query = "
 SELECT member_casual, 
       COUNT(*) AS number_of_rides,
       SUM(ride_length) AS total_ride_duration,
       AVG(ride_length) AS average_ride_duration,
-      MAX(ride_length) AS max_ride_duration,
-      MIN(ride_length) AS min_ride_duration
+      MAX(ride_length) AS max_ride_duration
 FROM merged_data
 GROUP BY member_casual;
 "
@@ -299,11 +360,18 @@ ride_summary = sqldf(query)
 ride_summary
 ```
 
-## Number of rides:
+**Insight:**
 
-### By day of week:
+-   Members take significantly more rides than casual riders (`r ride_summary$number_of_rides[2] / ride_summary$number_of_rides[1]` more), which indicate that members might use service as a regular mode of transportation, while casual riders use for occasional or recreational purposes.
+-   Casual riders account for a nearly equivalent ride duration compared to members.
+-   Casual riders spend almost twice as long on average per ride compared to members, which indicate that casual riders are likely using longer and more relaxed rides for leisure..., while members use bike for more practical purposes, so trips are shorter.
+-   Casual riders have significantly longer maximum trip durations, may be for special activities, while members rarely take long trips, likely due to structured usage patterns.
 
-#### Table
+## By day of week:
+
+### Table
+
+#### Table Number of Rides:
 
 ```{r}
 query = "
@@ -318,17 +386,62 @@ SELECT member_casual AS user_type,
 FROM merged_data
 GROUP BY member_casual;
 "
-rides_by_user_type_day_of_week = sqldf(query)
-rides_by_user_type_day_of_week
+rides_by_day_of_week = sqldf(query)
+rides_by_day_of_week
 ```
 
-#### Visualize
-
-Prepare dataframe for visualization:
+#### Table Total Ride Duration:
 
 ```{r}
 query = "
-SELECT member_casual AS user_type, day_of_week, COUNT(*) AS num_rides
+SELECT member_casual AS user_type, 
+       SUM(CASE WHEN day_of_week = 'Sunday' THEN ride_length ELSE 0 END) AS Sunday,
+       SUM(CASE WHEN day_of_week = 'Monday' THEN ride_length ELSE 0 END) AS Monday,
+       SUM(CASE WHEN day_of_week = 'Tuesday' THEN ride_length ELSE 0 END) AS Tuesday,
+       SUM(CASE WHEN day_of_week = 'Wednesday' THEN ride_length ELSE 0 END) AS Wednesday,
+       SUM(CASE WHEN day_of_week = 'Thursday' THEN ride_length ELSE 0 END) AS Thursday,
+       SUM(CASE WHEN day_of_week = 'Friday' THEN ride_length ELSE 0 END) AS Friday,
+       SUM(CASE WHEN day_of_week = 'Saturday' THEN ride_length ELSE 0 END) AS Saturday
+FROM merged_data
+GROUP BY member_casual;
+"
+total_ride_duration_by_day_of_week = sqldf(query)
+total_ride_duration_by_day_of_week
+```
+
+It somewhat hard to see, so I will change the unit into `hour`:
+
+```{r}
+total_ride_duration_by_day_of_week[-1] = total_ride_duration_by_day_of_week[-1] / 3600
+total_ride_duration_by_day_of_week
+```
+
+#### Table Average Ride Duration:
+
+```{r}
+query = "
+SELECT member_casual AS user_type, 
+       AVG(CASE WHEN day_of_week = 'Sunday' THEN ride_length END) AS Sunday,
+       AVG(CASE WHEN day_of_week = 'Monday' THEN ride_length END) AS Monday,
+       AVG(CASE WHEN day_of_week = 'Tuesday' THEN ride_length END) AS Tuesday,
+       AVG(CASE WHEN day_of_week = 'Wednesday' THEN ride_length END) AS Wednesday,
+       AVG(CASE WHEN day_of_week = 'Thursday' THEN ride_length END) AS Thursday,
+       AVG(CASE WHEN day_of_week = 'Friday' THEN ride_length END) AS Friday,
+       AVG(CASE WHEN day_of_week = 'Saturday' THEN ride_length END) AS Saturday
+FROM merged_data
+GROUP BY member_casual;
+"
+avg_ride_duration_by_day_of_week = sqldf(query)
+avg_ride_duration_by_day_of_week
+```
+
+### Visualize
+
+#### Prepare dataframe for visualization:
+
+```{r}
+query = "
+SELECT member_casual AS user_type, day_of_week, COUNT(*) AS num_rides, SUM(ride_length) AS total_duration, AVG(ride_length) AS average_duration
 FROM merged_data
 GROUP BY user_type, day_of_week
 ORDER BY 
@@ -342,54 +455,53 @@ ORDER BY
         WHEN day_of_week = 'Saturday' THEN 7
     END;
 "
-df_rides_by_user_type_day_of_week = sqldf(query)
+df_by_day_of_week = sqldf(query)
 #For order x-axis
-df_rides_by_user_type_day_of_week$day_of_week = factor(df_rides_by_user_type_day_of_week$day_of_week, levels=unique(df_rides_by_user_type_day_of_week$day_of_week))
-
-write.csv(df_rides_by_user_type_day_of_week, "../Data/Summary/rides_by_user_type_day_of_week.csv")
+df_by_day_of_week$day_of_week = factor(df_by_day_of_week$day_of_week, levels=unique(df_by_day_of_week$day_of_week))
 ```
 
-Pie chart:
+#### Multiple Bar Plot for Number of Rides:
 
 ```{r}
-colors <- c("Monday" = "#FFFAF0",    # Floral White
-            "Tuesday" = "#CD5C5C",   # Indian Red
-            "Wednesday" = "#32CD32", # Lime Green
-            "Thursday" = "#FFFFE0",  # Light Yellow
-            "Friday" = "#F0F8FF",    # Alice Blue
-            "Saturday" = "#663399",  # Rebecca Purple
-            "Sunday" = "#800000")    # Maroon
-par(mfrow = c(1,2))
-pie(df_rides_by_user_type_day_of_week$num_rides[df_rides_by_user_type_day_of_week$user_type == "casual"],
-    df_rides_by_user_type_day_of_week$day_of_week[df_rides_by_user_type_day_of_week$user_type == "casual"],
-    sub = "Casual User",
-    col = colors[df_rides_by_user_type_day_of_week$day_of_week[df_rides_by_user_type_day_of_week$user_type == "casual"]])
-
-pie(df_rides_by_user_type_day_of_week$num_rides[df_rides_by_user_type_day_of_week$user_type == "member"],
-    df_rides_by_user_type_day_of_week$day_of_week[df_rides_by_user_type_day_of_week$user_type == "member"],
-    sub = "Member User",
-    col = colors[df_rides_by_user_type_day_of_week$day_of_week[df_rides_by_user_type_day_of_week$user_type == "member"]])
-title("Rides Distribution by Day of the Week",line = - 2, outer = TRUE)
-```
-
-Multiple Bar Plot
-
-```{r}
-ggplot(df_rides_by_user_type_day_of_week, aes(x = day_of_week, y = num_rides, fill = user_type)) +
+ggplot(df_by_day_of_week, aes(x = day_of_week, y = num_rides, fill = user_type)) +
   geom_bar(stat = "identity", position = "dodge") +
-  labs(title = "Number of Rides by User Type and Day of the Week",
+  labs(title = "Number of Rides by Day of the Week",
        x = "Day of the Week",
        y = "Number of Rides") +
   theme_minimal() +
   scale_y_continuous(labels = scales::label_number())
 ```
 
-**Insight**
+#### Multiple Bar Plot for Total Ride Duration:
 
--   Casual users primarily use the service on weekends, with a peak on Saturday, indicating more leisure or occasional usage.
+```{r}
+ggplot(df_by_day_of_week, aes(x = day_of_week, y = total_duration, fill = user_type)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Total Ride Duration by Day of the Week",
+       x = "Day of the Week",
+       y = "Ride Length") +
+  theme_minimal() +
+  scale_y_continuous(labels = scales::label_number())
+```
+
+#### Multiple Bar Plot for Average Ride Duration:
+
+```{r}
+ggplot(df_by_day_of_week, aes(x = day_of_week, y = average_duration, fill = user_type)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Average Ride Duration by Day of the Week",
+       x = "Day of the Week",
+       y = "Ride Length") +
+  theme_minimal() +
+  scale_y_continuous(labels = scales::label_number())
+```
+
+**Insight:**
+
+-   Casual users primarily use the service on Friday, Saturday and Sunday, indicating more leisure or occasional usage.
 -   Members use the service more consistently throughout the week, with higher usage on weekdays, particularly on Thursday, suggesting more regular or commuter-based usage.
 
-### By time interval:
+## By time interval:
 
 Let define something first:
 
@@ -401,7 +513,9 @@ Let define something first:
     -   **Evening Commute (3:00 PM - 7:00 PM):** Peak usage time as people return home form work or school.
     -   **Night (7:00 PM - 12:00 AM):** Leisure, social outings, or exercise.
 
-#### Table
+### Table
+
+#### Table Number of Rides:
 
 ```{r}
 query = "
@@ -414,17 +528,51 @@ SELECT member_casual AS user_type,
 FROM merged_data
 GROUP BY member_casual;
 "
-rides_by_user_type_time_interval = sqldf(query)
-rides_by_user_type_time_interval
+rides_by_time_interval = sqldf(query)
+rides_by_time_interval
 ```
 
-#### Visualize
-
-Prepare dataframe for visualization:
+#### Table Total Ride Duration:
 
 ```{r}
 query = "
-SELECT member_casual AS user_type, time_interval, COUNT(*) AS num_rides
+SELECT member_casual AS user_type, 
+       SUM(CASE WHEN time_interval = 'Early Morning' THEN ride_length ELSE 0 END) AS EarlyMorning,
+       SUM(CASE WHEN time_interval = 'Morning Commute' THEN ride_length ELSE 0 END) AS MorningCommute,
+       SUM(CASE WHEN time_interval = 'Midday' THEN ride_length ELSE 0 END) AS Midday,
+       SUM(CASE WHEN time_interval = 'Evening Commute' THEN ride_length ELSE 0 END) AS EveningCommute,
+       SUM(CASE WHEN time_interval = 'Night' THEN ride_length ELSE 0 END) AS Night
+FROM merged_data
+GROUP BY member_casual;
+"
+total_ride_duration_by_time_interval = sqldf(query)
+total_ride_duration_by_time_interval
+```
+
+#### Table Average Ride Duration:
+
+```{r}
+query = "
+SELECT member_casual AS user_type, 
+       AVG(CASE WHEN time_interval = 'Early Morning' THEN ride_length ELSE 0 END) AS EarlyMorning,
+       AVG(CASE WHEN time_interval = 'Morning Commute' THEN ride_length ELSE 0 END) AS MorningCommute,
+       AVG(CASE WHEN time_interval = 'Midday' THEN ride_length ELSE 0 END) AS Midday,
+       AVG(CASE WHEN time_interval = 'Evening Commute' THEN ride_length ELSE 0 END) AS EveningCommute,
+       AVG(CASE WHEN time_interval = 'Night' THEN ride_length ELSE 0 END) AS Night
+FROM merged_data
+GROUP BY member_casual;
+"
+avg_ride_duration_by_time_interval = sqldf(query)
+avg_ride_duration_by_time_interval
+```
+
+### Visualize
+
+#### Prepare dataframe for visualization:
+
+```{r}
+query = "
+SELECT member_casual AS user_type, time_interval, COUNT(*) AS num_rides, SUM(ride_length) AS total_duration, AVG(ride_length) AS average_duration
 FROM merged_data
 GROUP BY user_type, time_interval
 ORDER BY 
@@ -436,44 +584,43 @@ ORDER BY
         WHEN time_interval = 'Night' THEN 5
     END;
 "
-df_rides_by_user_type_time_interval = sqldf(query)
+df_by_time_interval = sqldf(query)
 #For order x-axis
-df_rides_by_user_type_time_interval$time_interval = factor(df_rides_by_user_type_time_interval$time_interval, levels=unique(df_rides_by_user_type_time_interval$time_interval))
-
-write.csv(df_rides_by_user_type_time_interval, "../Data/Summary/df_rides_by_user_type_time_interval.csv")
+df_by_time_interval$time_interval = factor(df_by_time_interval$time_interval, levels=unique(df_by_time_interval$time_interval))
 ```
 
-Pie chart:
+#### Multiple Bar Plot for Number of Rides:
 
 ```{r}
-# Define colors for the 5 time intervals
-time_interval_colors <- c("Early Morning" = "#ADD8E6",  # Light Blue
-                          "Morning Commute" = "#FFFF00", # Yellow
-                          "Midday" = "#32CD32",          # Lime Green
-                          "Evening Commute" = "#FFA500", # Orange
-                          "Night" = "#00008B")           # Dark Blue
-
-par(mfrow = c(1,2), mar = c(5, 5, 5, 5))
-pie(df_rides_by_user_type_time_interval$num_rides[df_rides_by_user_type_time_interval$user_type == "casual"],
-    df_rides_by_user_type_time_interval$time_interval[df_rides_by_user_type_time_interval$user_type == "casual"],
-    sub = "Casual User",
-    col = time_interval_colors[df_rides_by_user_type_time_interval$time_interval[df_rides_by_user_type_time_interval$user_type == "casual"]])
-
-pie(df_rides_by_user_type_time_interval$num_rides[df_rides_by_user_type_time_interval$user_type == "member"],
-    df_rides_by_user_type_time_interval$time_interval[df_rides_by_user_type_time_interval$user_type == "member"],
-    sub = "Member User",
-    col = time_interval_colors[df_rides_by_user_type_time_interval$time_interval[df_rides_by_user_type_time_interval$user_type == "member"]])
-title("Rides Distribution by Time interval",line = - 2, outer = TRUE)
-```
-
-Multiple Bar Plot
-
-```{r}
-ggplot(df_rides_by_user_type_time_interval, aes(x = time_interval, y = num_rides, fill = user_type)) +
+ggplot(df_by_time_interval, aes(x = time_interval, y = num_rides, fill = user_type)) +
   geom_bar(stat = "identity", position = "dodge") +
-  labs(title = "Number of Rides by User Type and Time Interval",
+  labs(title = "Number of Rides by Time Interval",
        x = "Time Interval",
        y = "Number of Rides") +
+  theme_minimal() +
+  scale_y_continuous(labels = scales::label_number())
+```
+
+#### Multiple Bar Plot for Total Ride Duration:
+
+```{r}
+ggplot(df_by_time_interval, aes(x = time_interval, y = total_duration, fill = user_type)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Total Ride Duration by Time Interval",
+       x = "Time Interval",
+       y = "Ride Length") +
+  theme_minimal() +
+  scale_y_continuous(labels = scales::label_number())
+```
+
+#### Multiple Bar Plot for Average Ride Duration:
+
+```{r}
+ggplot(df_by_time_interval, aes(x = time_interval, y = average_duration, fill = user_type)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Average Ride Duration by Time Interval",
+       x = "Time Interval",
+       y = "Ride Length") +
   theme_minimal() +
   scale_y_continuous(labels = scales::label_number())
 ```
@@ -483,9 +630,11 @@ ggplot(df_rides_by_user_type_time_interval, aes(x = time_interval, y = num_rides
 -   Casual Users: Peak usage during midday and evening commute; active at night, indicating flexible, leisure-oriented rides rather than structured commuting.
 -   Member Users: Dominant during commuting hours, with consistent usage across all intervals, reflecting structured, regular travel patterns.
 
-### By month:
+## By month:
 
-#### Table
+### Table
+
+#### Table Number of Rides:
 
 ```{r}
 query = "
@@ -505,17 +654,65 @@ SELECT member_casual AS user_type,
 FROM merged_data
 GROUP BY member_casual;
 "
-rides_by_user_type_month = sqldf(query)
-rides_by_user_type_month
+rides_by_month = sqldf(query)
+rides_by_month
 ```
 
-#### Visualize
-
-Prepare dataframe for visualization:
+#### Table Total Ride Duration:
 
 ```{r}
 query = "
-SELECT member_casual AS user_type, month, COUNT(*) AS num_rides
+SELECT member_casual AS user_type, 
+       SUM(CASE WHEN month = '01' THEN ride_length ELSE 0 END) AS Jan,
+       SUM(CASE WHEN month = '02' THEN ride_length ELSE 0 END) AS Feb,
+       SUM(CASE WHEN month = '03' THEN ride_length ELSE 0 END) AS Mar,
+       SUM(CASE WHEN month = '04' THEN ride_length ELSE 0 END) AS Apr,
+       SUM(CASE WHEN month = '05' THEN ride_length ELSE 0 END) AS May,
+       SUM(CASE WHEN month = '06' THEN ride_length ELSE 0 END) AS Jun,
+       SUM(CASE WHEN month = '07' THEN ride_length ELSE 0 END) AS Jul,
+       SUM(CASE WHEN month = '08' THEN ride_length ELSE 0 END) AS Aug,
+       SUM(CASE WHEN month = '09' THEN ride_length ELSE 0 END) AS Sep,
+       SUM(CASE WHEN month = '10' THEN ride_length ELSE 0 END) AS Oct,
+       SUM(CASE WHEN month = '11' THEN ride_length ELSE 0 END) AS Nov,
+       SUM(CASE WHEN month = '12' THEN ride_length ELSE 0 END) AS Dec
+FROM merged_data
+GROUP BY member_casual;
+"
+total_ride_duration_by_month = sqldf(query)
+total_ride_duration_by_month
+```
+
+#### Table Average Ride Duration:
+
+```{r}
+query = "
+SELECT member_casual AS user_type, 
+       AVG(CASE WHEN month = '01' THEN ride_length END) AS Jan,
+       AVG(CASE WHEN month = '02' THEN ride_length END) AS Feb,
+       AVG(CASE WHEN month = '03' THEN ride_length END) AS Mar,
+       AVG(CASE WHEN month = '04' THEN ride_length END) AS Apr,
+       AVG(CASE WHEN month = '05' THEN ride_length END) AS May,
+       AVG(CASE WHEN month = '06' THEN ride_length END) AS Jun,
+       AVG(CASE WHEN month = '07' THEN ride_length END) AS Jul,
+       AVG(CASE WHEN month = '08' THEN ride_length END) AS Aug,
+       AVG(CASE WHEN month = '09' THEN ride_length END) AS Sep,
+       AVG(CASE WHEN month = '10' THEN ride_length END) AS Oct,
+       AVG(CASE WHEN month = '11' THEN ride_length END) AS Nov,
+       AVG(CASE WHEN month = '12' THEN ride_length END) AS Dec
+FROM merged_data
+GROUP BY member_casual;
+"
+avg_ride_duration_by_month = sqldf(query)
+avg_ride_duration_by_month
+```
+
+### Visualize
+
+#### Prepare dataframe for visualization:
+
+```{r}
+query = "
+SELECT member_casual AS user_type, month, COUNT(*) AS num_rides, SUM(ride_length) AS total_duration, AVG(ride_length) AS average_duration
 FROM merged_data
 GROUP BY user_type, month
 ORDER BY 
@@ -534,44 +731,48 @@ ORDER BY
         WHEN month = '12' THEN 12
     END;
 "
-df_rides_by_user_type_month = sqldf(query)
+df_by_month = sqldf(query)
 #For order x-axis
-df_rides_by_user_type_month$month = factor(df_rides_by_user_type_month$month, levels=unique(df_rides_by_user_type_month$month))
-
-write.csv(df_rides_by_user_type_month, "../Data/Summary/df_rides_by_user_type_month.csv")
+df_by_month$month = factor(df_by_month$month, levels=unique(df_by_month$month))
 ```
 
-Pie chart:
+#### Multiple Bar Plot for Number of Rides:
 
 ```{r}
-par(mfrow = c(1,2))
-pie(df_rides_by_user_type_month$num_rides[df_rides_by_user_type_month$user_type == "casual"],
-    df_rides_by_user_type_month$month[df_rides_by_user_type_month$user_type == "casual"],
-    sub = "Casual User")
-
-pie(df_rides_by_user_type_month$num_rides[df_rides_by_user_type_month$user_type == "member"],
-    df_rides_by_user_type_month$month[df_rides_by_user_type_month$user_type == "member"],
-    sub = "Member User")
-title("Rides Distribution by Month",line = - 2, outer = TRUE)
-```
-
-Multiple Bar Plot
-
-```{r}
-ggplot(df_rides_by_user_type_month, aes(x = month, y = num_rides, fill = user_type)) +
+ggplot(df_by_month, aes(x = month, y = num_rides, fill = user_type)) +
   geom_bar(stat = "identity", position = "dodge") +
-  labs(title = "Number of Rides by User Type and Month",
+  labs(title = "Number of Rides by Month",
        x = "Time Interval",
        y = "Number of Rides") +
   theme_minimal() +
   scale_y_continuous(labels = scales::label_number())
 ```
 
+#### Multiple Bar Plot for Total Ride Duration:
+
+```{r}
+ggplot(df_by_month, aes(x = month, y = total_duration, fill = user_type)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Number of Rides by Month",
+       x = "Time Interval",
+       y = "Number of Rides") +
+  theme_minimal() +
+  scale_y_continuous(labels = scales::label_number())
+```
+
+#### Multiple Bar Plot for Average Ride Duration:
+
+```{r}
+ggplot(df_by_month, aes(x = month, y = average_duration, fill = user_type)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Number of Rides by Month",
+       x = "Time Interval",
+       y = "Number of Rides") +
+  theme_minimal() +
+  scale_y_continuous(labels = scales::label_number())
+```
 
 **Insight:**
 
--   Casual Users: Their rides peak during the summer months, strongly indicating that their primary use is for leisure or recreational purposes. This behavior is heavily influenced by warm weather, aligning with seasonal outdoor activities.
--   Member Users: Their rides show a more consistent pattern throughout the year, with less dramatic seasonal variation compared to casual users. This suggests that members likely use bikes not just for recreation, but also for commuting or other routine activities, making their usage more practical and need-based.
-
-
-## Ride length (ride duration):
+-   Casual Users rides peak during the summer months, strongly indicating that their primary use is for leisure or recreational purposes. This behavior is heavily influenced by warm weather, aligning with seasonal outdoor activities.
+-   Member's rides show a more consistent pattern throughout the year, with less dramatic seasonal variation compared to casual users. This suggests that members likely use bikes not just for recreation, but also for commuting or other routine activities, making their usage more practical and need-based.
